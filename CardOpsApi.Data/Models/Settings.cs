@@ -9,13 +9,9 @@ namespace CardOpsApi.Data.Models
         [Key]
         public int Id { get; set; }
 
-        public int TransactionAmount { get; set; }
+    
+        public int TopAtmRefundLimit { get; set; } = 5; // default to 5
 
-        public int TransactionAmountForeign { get; set; }
-
-        public string TransactionTimeTo { get; set; } = string.Empty;
-
-        public string TimeToIdle { get; set; } = string.Empty;
-
+        public int TopReasonLimit { get; set; } = 10; // default to 10
     }
 }

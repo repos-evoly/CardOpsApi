@@ -14,12 +14,15 @@ namespace CardOpsApi
             CreateMap<Definition, DefinitionDto>();
 
             // Transactions
-            CreateMap<Transactions, TransactionDto>()
-                .ForMember(dest => dest.ReasonId, opt => opt.MapFrom(src => src.ReasonId))
-                .ForMember(dest => dest.ReasonName, opt => opt.MapFrom(src => src.Reason != null ? src.Reason.NameAR : null))
-                .ForMember(dest => dest.CurrencyCode, opt => opt.MapFrom(src => src.Currency != null ? src.Currency.Code : string.Empty));
             CreateMap<TransactionCreateDto, Transactions>();
-            CreateMap<TransactionUpdateDto, Transactions>();
+
+            CreateMap<TransactionUpdateDto, Transactions>()
+             // Always take the ReasonId from the DTO.
+             .ForMember(dest => dest.ReasonId, opt => opt.MapFrom(src => src.ReasonId));
+
+            CreateMap<Transactions, TransactionDto>()
+                .ForMember(dest => dest.CurrencyCode, opt => opt.MapFrom(src => src.Currency.Code))
+                .ForMember(dest => dest.ReasonName, opt => opt.MapFrom(src => src.Reason != null ? src.Reason.NameAR : string.Empty)); ;
 
 
             CreateMap<Currency, CurrencyDto>();
@@ -32,9 +35,8 @@ namespace CardOpsApi
 
 
             CreateMap<Settings, SettingsDto>()
-              .ForMember(dest => dest.TransactionAmount, opt => opt.MapFrom(src => src.TransactionAmount))
-              .ForMember(dest => dest.TransactionTimeTo, opt => opt.MapFrom(src => src.TransactionTimeTo))
-              .ForMember(dest => dest.TimeToIdle, opt => opt.MapFrom(src => src.TimeToIdle))
+              .ForMember(dest => dest.TopAtmRefundLimit, opt => opt.MapFrom(src => src.TopAtmRefundLimit))
+              .ForMember(dest => dest.TopReasonLimit, opt => opt.MapFrom(src => src.TopReasonLimit))
               .ReverseMap();
         }
     }

@@ -12,7 +12,8 @@ namespace CardOpsApi.Core.Abstractions
         Task<bool> AssignUserPermissions(int userId, List<UserPermissionAssignmentDto> permissions);
 
         Task<bool> RemoveRolePermissions(int userId);
-        Task<List<UserDetailsDto>> GetUsers(string authToken);
+        Task<List<UserDetailsDto>> GetUsersAsync(string? searchTerm, string? searchBy, int page, int limit, string authToken);
+        Task<int> GetUserCountAsync(string? searchTerm, string? searchBy);
         Task<UserDetailsDto?> GetUserById(int userId, string authToken);
         Task<UserDetailsDto?> GetUserByAuthId(int userId, string authToken);
         Task<List<PermissionStatusDto>> GetUserPermissions(int userId);

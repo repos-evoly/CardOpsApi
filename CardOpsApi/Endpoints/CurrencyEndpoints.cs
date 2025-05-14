@@ -52,11 +52,16 @@ namespace CardOpsApi.Endpoints
             [FromQuery] string? searchTerm,
             [FromQuery] string? searchBy,
             [FromQuery] int page = 1,
-            [FromQuery] int limit = 10)
+            [FromQuery] int limit = 100000)
         {
             var currencies = await currencyRepository.GetAllAsync(searchTerm, searchBy, page, limit);
             var currencyDtos = mapper.Map<List<CurrencyDto>>(currencies);
-            return Results.Ok(currencyDtos);
+
+            int totalRecords = await currencyRepository.GetCountAsync(searchTerm, searchBy);
+            int totalPages = (int)System.Math.Ceiling((double)totalRecords / limit);
+
+            return Results.Ok(new { Data = currencyDtos, TotalPages = totalPages });
+
         }
 
         public static async Task<IResult> GetCurrencyById(

@@ -114,19 +114,41 @@ namespace CardOpsApi.Core.Repositories
             return true;
         }
 
-        public async Task<List<UserDetailsDto>> GetUsers(string authToken)
+        public async Task<List<UserDetailsDto>> GetUsersAsync(string? searchTerm, string? searchBy, int page, int limit, string authToken)
         {
-            var users = await _context.Users
-                .Include(u => u.Role)
-                .ToListAsync();
+            IQueryable<User> query = _context.Users.Include(u => u.Role);
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                switch (searchBy?.ToLower())
+                {
+                    case "firstname":
+                        query = query.Where(u => u.FirstName.Contains(searchTerm));
+                        break;
+                    case "lastname":
+                        query = query.Where(u => u.LastName.Contains(searchTerm));
+                        break;
+                    case "email":
+                        query = query.Where(u => u.Email.Contains(searchTerm));
+                        break;
+                    default:
+                        query = query.Where(u => u.FirstName.Contains(searchTerm) || u.LastName.Contains(searchTerm) || u.Email.Contains(searchTerm));
+                        break;
+                }
+            }
+
+            var users = await query.OrderBy(u => u.Id)
+                                   .Skip((page - 1) * limit)
+                                   .Take(limit)
+                                   .AsNoTracking()
+                                   .ToListAsync();
 
             var userDetailsList = new List<UserDetailsDto>();
-
             foreach (var user in users)
             {
+                // Reuse your existing logic to fetch additional auth info.
                 var authUser = await FetchAuthUserDetails(user.Id, authToken);
-
-                var userDto = new UserDetailsDto
+                userDetailsList.Add(new UserDetailsDto
                 {
                     UserId = user.Id,
                     AuthUserId = authUser?.Id ?? 0,
@@ -138,13 +160,35 @@ namespace CardOpsApi.Core.Repositories
                     RoleId = user.Role?.Id ?? 0,
                     IsTwoFactorEnabled = authUser?.IsTwoFactorEnabled ?? false,
                     PasswordResetToken = authUser?.PasswordResetToken
-                };
-
-                userDetailsList.Add(userDto);
+                });
             }
-
             return userDetailsList;
         }
+
+        public async Task<int> GetUserCountAsync(string? searchTerm, string? searchBy)
+        {
+            IQueryable<User> query = _context.Users;
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                switch (searchBy?.ToLower())
+                {
+                    case "firstname":
+                        query = query.Where(u => u.FirstName.Contains(searchTerm));
+                        break;
+                    case "lastname":
+                        query = query.Where(u => u.LastName.Contains(searchTerm));
+                        break;
+                    case "email":
+                        query = query.Where(u => u.Email.Contains(searchTerm));
+                        break;
+                    default:
+                        query = query.Where(u => u.FirstName.Contains(searchTerm) || u.LastName.Contains(searchTerm) || u.Email.Contains(searchTerm));
+                        break;
+                }
+            }
+            return await query.AsNoTracking().CountAsync();
+        }
+
 
         public async Task<UserDetailsDto?> GetUserById(int userId, string authToken)
         {
@@ -178,7 +222,7 @@ namespace CardOpsApi.Core.Repositories
                 Phone = user.Phone,
                 Role = user.Role,
                 RoleId = user.Role?.Id ?? 0,
-  
+
                 IsTwoFactorEnabled = authUser?.IsTwoFactorEnabled ?? false,
                 PasswordResetToken = authUser?.PasswordResetToken,
                 Permissions = userPermissionNames
@@ -233,7 +277,7 @@ namespace CardOpsApi.Core.Repositories
             try
             {
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
-                var response = await _httpClient.GetAsync($"http://10.3.3.11/authapi/api/users/{userId}");
+                var response = await _httpClient.GetAsync($"http://10.1.1.205/authapi/api/users/{userId}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -276,7 +320,7 @@ namespace CardOpsApi.Core.Repositories
             user.Email = editUserDto.Email;
             user.Phone = editUserDto.Phone;
             user.RoleId = editUserDto.RoleId;
-         
+
 
             await _context.SaveChangesAsync();
             return true;

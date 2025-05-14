@@ -304,19 +304,11 @@ namespace CardOpsApi.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("TimeToIdle")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("TransactionAmount")
+                    b.Property<int>("TopAtmRefundLimit")
                         .HasColumnType("int");
 
-                    b.Property<int>("TransactionAmountForeign")
+                    b.Property<int>("TopReasonLimit")
                         .HasColumnType("int");
-
-                    b.Property<string>("TransactionTimeTo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");

@@ -75,10 +75,9 @@ namespace CardOpsApi.Data.Seeding
             {
                 var settings = new Settings
                 {
-                    TransactionAmount = 50000,
-                    TransactionAmountForeign = 10000,
-                    TransactionTimeTo = "10",
-                    TimeToIdle = "15"
+                    TopAtmRefundLimit = 10,
+                    TopReasonLimit = 10
+
                 };
 
                 _context.Settings.Add(settings);
@@ -258,7 +257,7 @@ namespace CardOpsApi.Data.Seeding
                     transactions.Add(new Transactions
                     {
                         FromAccount = def.AccountNumber,
-                        ToAccount = "DEST" + i.ToString("D3"),
+                        ToAccount = (100000000000 + i).ToString(),
                         Amount = 100 + i * 10, // Example amount.
                         Narrative = isRefund ? $"Refund - transaction {i}" : $"Standard transaction {i}",
                         Date = DateTimeOffset.Now.AddDays(-i),

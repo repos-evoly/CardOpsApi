@@ -7,6 +7,7 @@ using System.Security.Claims;
 using CardOpsApi.Abstractions;
 using CardOpsApi.Core.Dtos;
 using System.Text.Json;
+using AutoMapper;
 
 namespace CardOpsApi.Endpoints
 {
@@ -134,7 +135,7 @@ namespace CardOpsApi.Endpoints
             var jsonPayload = JsonSerializer.Serialize(authPayload);
             var content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await httpClient.PostAsync("http://10.3.3.11/authcardopsapi/api/auth/register", content);
+            var response = await httpClient.PostAsync("http://10.1.1.205/authcardopsapi/api/auth/register", content);
             var responseBody = await response.Content.ReadAsStringAsync();
 
             // ✅ Check if response body is empty or malformed
@@ -203,15 +204,24 @@ namespace CardOpsApi.Endpoints
 
 
         public static async Task<IResult> GetUsers(
-            HttpContext context,
-            [FromServices] IUserRepository userRepository,
-            ILogger<UserEndpoints> logger)
+           HttpContext context,
+           [FromServices] IUserRepository userRepository,
+           [FromServices] IMapper mapper,
+           [FromQuery] string? searchTerm,
+           [FromQuery] string? searchBy,
+           [FromQuery] int page = 1,
+           [FromQuery] int limit = 100000)
         {
             var authToken = context.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
 
-            logger.LogInformation("Fetching all users with authentication details");
-            var users = await userRepository.GetUsers(authToken);
-            return Results.Ok(users);
+            // Retrieve paginated users.
+            var users = await userRepository.GetUsersAsync(searchTerm, searchBy, page, limit, authToken);
+
+            // Retrieve total count for the filters.
+            int totalCount = await userRepository.GetUserCountAsync(searchTerm, searchBy);
+            int totalPages = (int)System.Math.Ceiling((double)totalCount / limit);
+
+            return Results.Ok(new { Data = users, TotalPages = totalPages });
         }
 
         public static async Task<IResult> GetUserById(

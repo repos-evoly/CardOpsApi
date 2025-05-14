@@ -11,7 +11,7 @@ namespace CardOpsApi.Core.Validators
         {
             RuleFor(x => x.FromAccount)
                 .NotEmpty().WithMessage("FromAccount is required.")
-                .MaximumLength(50).WithMessage("FromAccount cannot exceed 50 characters.");
+                .Length(13).WithMessage("FromAccount Should be 13 digits");
 
             RuleFor(x => x.Narrative)
                 .MaximumLength(250).WithMessage("Narrative cannot exceed 250 characters.");

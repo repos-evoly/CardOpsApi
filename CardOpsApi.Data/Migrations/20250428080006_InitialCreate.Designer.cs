@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CardOpsApi.Data.Migrations
 {
     [DbContext(typeof(CardOpsApiDbContext))]
-    [Migration("20250409070910_InitialCreate")]
+    [Migration("20250428080006_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -307,19 +307,11 @@ namespace CardOpsApi.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<string>("TimeToIdle")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("TransactionAmount")
+                    b.Property<int>("TopAtmRefundLimit")
                         .HasColumnType("int");
 
-                    b.Property<int>("TransactionAmountForeign")
+                    b.Property<int>("TopReasonLimit")
                         .HasColumnType("int");
-
-                    b.Property<string>("TransactionTimeTo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset");

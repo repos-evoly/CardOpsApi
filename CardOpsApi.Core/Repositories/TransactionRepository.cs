@@ -35,10 +35,10 @@ namespace CardOpsApi.Data.Repositories
 
         public async Task<IList<Transactions>> GetAllAsync(string? searchTerm, string? searchBy, string? type, int page, int limit)
         {
-            // Include Currency for proper mapping and potential filtering.
             IQueryable<Transactions> query = _context.Transactions
                 .Include(t => t.Currency)
-                .Include(t => t.Reason);
+                .Include(t => t.Reason)
+                .Include(t => t.Definition);
 
             if (!string.IsNullOrWhiteSpace(type))
                 query = query.Where(t => t.Type.ToLower() == type.ToLower());
@@ -73,6 +73,43 @@ namespace CardOpsApi.Data.Repositories
                               .Take(limit)
                               .AsNoTracking()
                               .ToListAsync();
+        }
+        public async Task<int> GetCountAsync(string? searchTerm, string? searchBy, string? type)
+        {
+            IQueryable<Transactions> query = _context.Transactions
+                .Include(t => t.Currency)
+                .Include(t => t.Reason)
+                .Include(t => t.Definition);
+
+            if (!string.IsNullOrWhiteSpace(type))
+                query = query.Where(t => t.Type.ToLower() == type.ToLower());
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                switch (searchBy?.ToLower())
+                {
+                    case "fromaccount":
+                        query = query.Where(t => t.FromAccount.Contains(searchTerm));
+                        break;
+                    case "narrative":
+                        query = query.Where(t => t.Narrative.Contains(searchTerm));
+                        break;
+                    case "status":
+                        query = query.Where(t => t.Status != null && t.Status.Contains(searchTerm));
+                        break;
+                    case "currency":
+                        query = query.Where(t => t.Currency.Code.Contains(searchTerm));
+                        break;
+                    default:
+                        query = query.Where(t => t.FromAccount.Contains(searchTerm)
+                                               || t.Narrative.Contains(searchTerm)
+                                               || (t.Status != null && t.Status.Contains(searchTerm))
+                                               || t.Currency.Code.Contains(searchTerm));
+                        break;
+                }
+            }
+
+            return await query.AsNoTracking().CountAsync();
         }
 
         public async Task<Transactions?> GetByIdAsync(int id)

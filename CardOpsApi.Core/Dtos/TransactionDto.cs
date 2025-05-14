@@ -77,4 +77,12 @@ namespace CardOpsApi.Core.Dtos
         public string ReasonName { get; set; } = string.Empty;
         public int TransactionCount { get; set; }
     }
+
+    public class ExternalTransactionDto
+    {
+        public string? PostingDate { get; set; }
+        public List<string> Narratives { get; set; } = new();
+        public decimal Amount { get; set; }
+        public string? DrCr { get; set; }
+    }
 }

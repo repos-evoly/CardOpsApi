@@ -23,12 +23,23 @@ namespace CardOpsApi.Endpoints
             reasons.MapDelete("/{id:int}", Delete);
         }
 
-        private static async Task<IResult> GetAll([FromServices] IReasonRepository repo, [FromServices] IMapper mapper,
-            [FromQuery] string? searchTerm, [FromQuery] string? searchBy, [FromQuery] int page = 1, [FromQuery] int limit = 10)
+        private static async Task<IResult> GetAll(
+           [FromServices] IReasonRepository repo,
+           [FromServices] IMapper mapper,
+           [FromQuery] string? searchTerm,
+           [FromQuery] string? searchBy,
+           [FromQuery] int page = 1,
+           [FromQuery] int limit = 100000)
         {
+            // Retrieve the page data.
             var data = await repo.GetAllAsync(searchTerm, searchBy, page, limit);
             var dto = mapper.Map<List<ReasonDto>>(data);
-            return Results.Ok(dto);
+
+            // Retrieve the total number of matching records.
+            int totalRecords = await repo.GetCountAsync(searchTerm, searchBy);
+            int totalPages = (int)System.Math.Ceiling((double)totalRecords / limit);
+
+            return Results.Ok(new { Data = dto, TotalPages = totalPages });
         }
 
         private static async Task<IResult> GetById(int id, [FromServices] IReasonRepository repo, [FromServices] IMapper mapper)

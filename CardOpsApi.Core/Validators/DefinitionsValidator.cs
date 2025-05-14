@@ -33,7 +33,7 @@ namespace CardOpsApi.Validators
         {
             RuleFor(d => d.AccountNumber)
                 .NotNull().NotEmpty().WithMessage("Account number is required.")
-                .MaximumLength(50).WithMessage("Account number cannot exceed 50 characters.");
+                .Length(13).WithMessage("FromAccount Should be 13 digits");
 
             RuleFor(d => d.Name)
                 .NotNull().NotEmpty().WithMessage("Name is required.")

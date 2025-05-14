@@ -63,6 +63,34 @@ namespace CardOpsApi.Core.Repositories
                               .ToListAsync();
         }
 
+        public async Task<int> GetCountAsync(string? searchTerm, string? searchBy)
+        {
+            IQueryable<Reason> query = _context.Reasons.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                switch (searchBy?.ToLower())
+                {
+                    case "namelt":
+                        query = query.Where(r => r.NameLT.Contains(searchTerm));
+                        break;
+                    case "namear":
+                        query = query.Where(r => r.NameAR.Contains(searchTerm));
+                        break;
+                    case "description":
+                        query = query.Where(r => r.Description != null && r.Description.Contains(searchTerm));
+                        break;
+                    default:
+                        query = query.Where(r => r.NameLT.Contains(searchTerm) ||
+                                                 r.NameAR.Contains(searchTerm) ||
+                                                 (r.Description != null && r.Description.Contains(searchTerm)));
+                        break;
+                }
+            }
+
+            return await query.AsNoTracking().CountAsync();
+        }
+
         public async Task<Reason?> GetByIdAsync(int id)
         {
             return await _context.Reasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id);

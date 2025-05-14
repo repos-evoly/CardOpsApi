@@ -59,6 +59,29 @@ namespace CardOpsApi.Data.Repositories
                               .ToListAsync();
         }
 
+        public async Task<int> GetCountAsync(string? searchTerm, string? searchBy)
+        {
+            IQueryable<Currency> query = _context.Currencies.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                switch (searchBy?.ToLower())
+                {
+                    case "code":
+                        query = query.Where(c => c.Code.Contains(searchTerm));
+                        break;
+                    case "description":
+                        query = query.Where(c => c.Description.Contains(searchTerm));
+                        break;
+                    default:
+                        query = query.Where(c => c.Code.Contains(searchTerm) || c.Description.Contains(searchTerm));
+                        break;
+                }
+            }
+
+            return await query.CountAsync();
+        }
+
         public async Task<Currency?> GetByIdAsync(int id)
         {
             return await _context.Currencies

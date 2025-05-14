@@ -92,6 +92,55 @@ namespace CardOpsApi.Data.Repositories
             return await query.AsNoTracking().ToListAsync();
         }
 
+        public async Task<int> GetCountAsync(string? searchTerm, string? searchBy, string? type)
+        {
+            IQueryable<Definition> query = _context.Definitions.Include(d => d.Currency);
+
+            if (!string.IsNullOrWhiteSpace(type))
+            {
+                var loweredType = type.Trim().ToLower();
+                query = query.Where(d => d.Type.ToLower() == loweredType);
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                searchTerm = searchTerm.Trim();
+                if (!string.IsNullOrWhiteSpace(searchBy))
+                {
+                    switch (searchBy.ToLower())
+                    {
+                        case "accountnumber":
+                            query = query.Where(d => d.AccountNumber.Contains(searchTerm));
+                            break;
+                        case "name":
+                            query = query.Where(d => d.Name.Contains(searchTerm));
+                            break;
+                        case "curr":
+                            query = query.Where(d => d.Currency.Code.Contains(searchTerm));
+                            break;
+                        case "type":
+                            query = query.Where(d => d.Type.Contains(searchTerm));
+                            break;
+                        default:
+                            query = query.Where(d => d.AccountNumber.Contains(searchTerm) ||
+                                                     d.Name.Contains(searchTerm) ||
+                                                     d.Currency.Code.Contains(searchTerm) ||
+                                                     d.Type.Contains(searchTerm));
+                            break;
+                    }
+                }
+                else
+                {
+                    query = query.Where(d => d.AccountNumber.Contains(searchTerm) ||
+                                             d.Name.Contains(searchTerm) ||
+                                             d.Currency.Code.Contains(searchTerm) ||
+                                             d.Type.Contains(searchTerm));
+                }
+            }
+
+            return await query.AsNoTracking().CountAsync();
+        }
+
         public async Task<Definition?> GetByIdAsync(int id)
         {
             return await _context.Definitions

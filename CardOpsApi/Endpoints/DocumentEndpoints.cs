@@ -85,7 +85,7 @@
 //             [FromServices] IDocumentRepository documentRepository,
 //             [FromServices] ILogger<DocumentEndpoints> logger,
 //             [FromQuery] int page = 1,
-//             [FromQuery] int limit = 10000)
+//             [FromQuery] int limit = 100000000)
 //         {
 //             IEnumerable<DocumentResponseDto> documents;
 

@@ -50,17 +50,22 @@ namespace CardOpsApi.Endpoints
 
         // GET /api/definitions?searchTerm=&searchBy=&type=&page=&limit=
         public static async Task<IResult> GetDefinitions(
-            [FromServices] IDefinitionRepository definitionRepository,
-            [FromServices] IMapper mapper,
-            [FromQuery] string? searchTerm,
-            [FromQuery] string? searchBy,
-            [FromQuery] string? type,
-            [FromQuery] int page = 1,
-            [FromQuery] int limit = 10)
+           [FromServices] IDefinitionRepository definitionRepository,
+           [FromServices] IMapper mapper,
+           [FromQuery] string? searchTerm,
+           [FromQuery] string? searchBy,
+           [FromQuery] string? type,
+           [FromQuery] int page = 1,
+           [FromQuery] int limit = 100000)
         {
             var definitions = await definitionRepository.GetAllAsync(searchTerm, searchBy, type, page, limit);
             var definitionDtos = mapper.Map<List<DefinitionDto>>(definitions);
-            return Results.Ok(definitionDtos);
+
+            // Get the total record count.
+            int totalRecords = await definitionRepository.GetCountAsync(searchTerm, searchBy, type);
+            int totalPages = (int)System.Math.Ceiling((double)totalRecords / limit);
+
+            return Results.Ok(new { Data = definitionDtos, TotalPages = totalPages });
         }
 
         // GET /api/definitions/{id}

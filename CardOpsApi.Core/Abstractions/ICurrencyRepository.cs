@@ -11,5 +11,7 @@ namespace CardOpsApi.Core.Abstractions
         Task CreateAsync(Currency currency);
         Task UpdateAsync(Currency currency);
         Task DeleteAsync(int id);
+        Task<int> GetCountAsync(string? searchTerm, string? searchBy);
+
     }
 }

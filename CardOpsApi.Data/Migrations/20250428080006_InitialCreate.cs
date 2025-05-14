@@ -82,10 +82,8 @@ namespace CardOpsApi.Data.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    TransactionAmount = table.Column<int>(type: "int", nullable: false),
-                    TransactionAmountForeign = table.Column<int>(type: "int", nullable: false),
-                    TransactionTimeTo = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    TimeToIdle = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TopAtmRefundLimit = table.Column<int>(type: "int", nullable: false),
+                    TopReasonLimit = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
                 },
