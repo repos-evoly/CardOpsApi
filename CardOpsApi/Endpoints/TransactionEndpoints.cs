@@ -16,6 +16,7 @@ using CardOpsApi.Abstractions;
 using CardOpsApi.Data.Abstractions;
 using System.Text.Json;
 using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
 
 namespace CardOpsApi.Endpoints
 {
@@ -78,28 +79,55 @@ namespace CardOpsApi.Endpoints
                         .Produces<List<ExternalTransactionDto>>(200)
                         .Produces(400);
 
+            transactions.MapPost("/{id}/reverse-refund", ReverseRefund)
+            .WithName("ReverseRefund")
+            .Produces(201)
+            .Produces(400)
+            .Produces(404);
+
+
         }
 
         // GET /api/transactions?searchTerm=&searchBy=&type=&page=&limit=
         public static async Task<IResult> GetTransactions(
-           [FromServices] ITransactionRepository transactionRepository,
-           [FromServices] IMapper mapper,
-           [FromQuery] string? searchTerm,
-           [FromQuery] string? searchBy,
-           [FromQuery] string? type,
-           [FromQuery] int page = 1,
-           [FromQuery] int limit = 100000)
+            [FromServices] ITransactionRepository transactionRepository,
+            [FromServices] IMapper mapper,
+            [FromQuery] string? searchTerm,
+            [FromQuery] string? searchBy,
+            [FromQuery] string? type,
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 100000)
         {
-            // Get the current page data.
-            var transactions = await transactionRepository.GetAllAsync(searchTerm, searchBy, type, page, limit);
+            var transactions = await transactionRepository
+                .GetAllAsync(searchTerm, searchBy, type, page, limit);
 
-            // Get the total count for the same filters.
-            int totalCount = await transactionRepository.GetCountAsync(searchTerm, searchBy, type);
-            int totalPages = (int)System.Math.Ceiling((double)totalCount / limit);
+            int totalCount = await transactionRepository
+                .GetCountAsync(searchTerm, searchBy, type);
+            int totalPages = (int)Math.Ceiling((double)totalCount / limit);
 
-            var transactionDtos = mapper.Map<List<TransactionDto>>(transactions);
-            return Results.Ok(new { Data = transactionDtos, TotalPages = totalPages });
+            var resultList = new List<TransactionDto>(transactions.Count);
+
+            foreach (var tx in transactions)
+            {
+                // Map your DTO
+                var dto = mapper.Map<TransactionDto>(tx);
+
+                // 1) pull the Definition name
+                dto.FromAccountName = tx.Definition?.Name?.Trim() ?? "Not available";
+
+                // 2) resolve the external account name
+                dto.ToAccountName = await ResolveExternalAccountNameAsync(tx.ToAccount);
+
+                resultList.Add(dto);
+            }
+
+            return Results.Ok(new
+            {
+                Data = resultList,
+                TotalPages = totalPages
+            });
         }
+
 
         // GET /api/transactions/{id}
         public static async Task<IResult> GetTransactionById(
@@ -117,11 +145,13 @@ namespace CardOpsApi.Endpoints
         }
 
         // POST /api/transactions
+        // 1) CREATE TRANSACTION
         public static async Task<IResult> CreateTransaction(
             [FromBody] TransactionCreateDto createDto,
             [FromServices] ITransactionRepository transactionRepository,
             [FromServices] IMapper mapper,
-            [FromServices] IValidator<TransactionCreateDto> validator)
+            [FromServices] IValidator<TransactionCreateDto> validator,
+            [FromServices] ILogger<TransactionEndpoints> logger)
         {
             ValidationResult validationResult = await validator.ValidateAsync(createDto);
             if (!validationResult.IsValid)
@@ -133,7 +163,16 @@ namespace CardOpsApi.Endpoints
             if (!string.IsNullOrWhiteSpace(createDto.Status) &&
                 createDto.Status.ToLower().Contains("refund"))
             {
-                var refundResult = await CallExternalRefundAsync(createDto);
+                logger.LogInformation(
+                    "[CreateTransaction] Initiating external refund from {FromAccount} to {ToAccount} for amount {Amount}",
+                    createDto.FromAccount, createDto.ToAccount, createDto.Amount);
+
+                var refundResult = await CallExternalRefundAsync(createDto, logger);
+
+                logger.LogInformation(
+                    "[CreateTransaction] External refund returned Success={Success}, Message={Message}",
+                    refundResult.isSuccess, refundResult.message);
+
                 if (!refundResult.isSuccess)
                 {
                     // Return the error message from the external API.
@@ -151,6 +190,7 @@ namespace CardOpsApi.Endpoints
 
             return Results.Created($"/api/transactions/{dto.Id}", new { Message = successMessage, Transaction = dto });
         }
+
 
         // PUT /api/transactions/{id}
         public static async Task<IResult> UpdateTransaction(
@@ -307,82 +347,157 @@ namespace CardOpsApi.Endpoints
             return Results.Ok(topReasons);
         }
 
-        // Private method to call the external refund API.
-        private static async Task<(bool isSuccess, string message)> CallExternalRefundAsync(TransactionCreateDto createDto)
+
+        private static async Task<string> ResolveExternalAccountNameAsync(string fullAccount)
         {
-            // Determine the currency code based on CurrencyId.
-            string currencyCode = createDto.CurrencyId switch
-            {
-                1 => "LYD",
-                2 => "USD",
-                3 => "EUR",
-                _ => "LYD"
-            };
+            const string url = "http://10.1.1.205:7070/api/mobile/accounts";
 
-            // === ALWAYS USE 3 DECIMAL-PLACES ===
-            const int DECIMALS = 3;
-            decimal scaleFactor = (decimal)Math.Pow(10, DECIMALS);  // 1000
-            long amountInUnits = (long)Math.Round(createDto.Amount * scaleFactor, MidpointRounding.AwayFromZero);
-            string formattedAmount = amountInUnits.ToString("D15");
+            // Extract the six digits
+            if (string.IsNullOrWhiteSpace(fullAccount) || fullAccount.Length != 13)
+                return "Not available";
+            string cid = fullAccount.Substring(4, 6);
 
-            var requestObj = new
+            var payload = new
             {
                 Header = new
                 {
                     system = "MOBILE",
                     referenceId = GenerateReferenceId(),
                     userName = "TEDMOB",
-                    customerNumber = createDto.ToAccount,
+                    customerNumber = cid,
                     requestTime = DateTime.UtcNow.ToString("o"),
                     language = "AR"
                 },
                 Details = new Dictionary<string, string>
                 {
-                    ["@TRFCCY"] = currencyCode,
-                    ["@SRCACC"] = createDto.FromAccount,
-                    ["@DSTACC"] = createDto.ToAccount,
-                    ["@DSTACC2"] = "",
-                    ["@TRFAMT"] = formattedAmount,
-                    ["@APLYTRN2"] = "N",
-                    ["@TRFAMT2"] = new string('0', 15),
-                    ["@NR2"] = createDto.Narrative
+                    ["@CID"] = cid,
+                    ["@GETAVB"] = "Y"
                 }
             };
 
             try
             {
                 using var client = new HttpClient();
-                string url = "http://10.3.3.11:7070/api/mobile/postTransfer";
-                var response = await client.PostAsJsonAsync(url, requestObj);
+                var resp = await client.PostAsJsonAsync(url, payload);
+                if (!resp.IsSuccessStatusCode) return "Not available";
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    return (false, $"External API call failed with status code {response.StatusCode}");
-                }
+                var ext = await resp.Content
+                                    .ReadFromJsonAsync<ExternalAccountsResponseDto>();
+                if (ext?.Details?.Accounts == null) return "Not available";
 
-                var respObj = await response.Content.ReadFromJsonAsync<ExternalRefundResponseDto>();
-                if (respObj?.Header == null)
-                {
-                    return (false, "Malformed response from external API.");
-                }
+                // find the matching one
+                var match = ext.Details.Accounts
+                    .Select(acc => new
+                    {
+                        Key = (acc.YBCD01AB?.Trim() ?? "")
+                            + (acc.YBCD01AN?.Trim() ?? "")
+                            + (acc.YBCD01AS?.Trim() ?? ""),
+                        acc
+                    })
+                    .FirstOrDefault(x => x.Key == fullAccount);
 
-                bool success = respObj.Header.ReturnCode
-                    .Equals("Success", StringComparison.OrdinalIgnoreCase);
-
-                return (success, respObj.Header.ReturnMessage);
+                return match?.acc.YBCD01CUNA?.Trim() ?? "Not available";
             }
-            catch (HttpRequestException ex)
+            catch
             {
-                return (false, $"HTTP Request Exception: {ex.Message}");
-            }
-            catch (Exception ex)
-            {
-                return (false, $"Error: {ex.Message}");
+                return "Not available";
             }
         }
+
+
+        // Private method to call the external refund API.
+        // 3) EXTERNAL REFUND HELPER
+            private static async Task<(bool isSuccess, string message)> CallExternalRefundAsync(
+                TransactionCreateDto createDto,
+                ILogger<TransactionEndpoints> logger)
+            {
+                // Determine the currency code based on CurrencyId.
+                string currencyCode = createDto.CurrencyId switch
+                {
+                    1 => "LYD",
+                    2 => "USD",
+                    3 => "EUR",
+                    _ => "LYD"
+                };
+
+                // === ALWAYS USE 3 DECIMAL-PLACES ===
+                const int DECIMALS = 3;
+                decimal scaleFactor = (decimal)Math.Pow(10, DECIMALS);  // 1000
+                long amountInUnits = (long)Math.Round(createDto.Amount * scaleFactor, MidpointRounding.AwayFromZero);
+                string formattedAmount = amountInUnits.ToString("D15");
+
+                var requestObj = new
+                {
+                    Header = new
+                    {
+                        system = "MOBILE",
+                        referenceId = GenerateReferenceId(),
+                        userName = "TEDMOB",
+                        customerNumber = createDto.ToAccount,
+                        requestTime = DateTime.UtcNow.ToString("o"),
+                        language = "AR"
+                    },
+                    Details = new Dictionary<string, string>
+                    {
+                        ["@TRFCCY"] = currencyCode,
+                        ["@SRCACC"] = createDto.FromAccount,
+                        ["@DSTACC"] = createDto.ToAccount,
+                        ["@DSTACC2"] = "",
+                        ["@TRFAMT"] = formattedAmount,
+                        ["@APLYTRN2"] = "N",
+                        ["@TRFAMT2"] = new string('0', 15),
+                        ["@NR2"] = createDto.Narrative
+                    }
+                };
+
+                // Log the outgoing JSON
+                var payloadJson = JsonSerializer.Serialize(requestObj);
+                logger.LogInformation("[CallExternalRefundAsync] ▶▶ Payload: {PayloadJson}", payloadJson);
+
+                try
+                {
+                    using var client = new HttpClient();
+                    string url = "http://10.1.1.205:7070/api/mobile/postTransfer";
+                    var response = await client.PostAsJsonAsync(url, requestObj);
+
+                    // Capture and log the raw response
+                    var raw = await response.Content.ReadAsStringAsync();
+                    logger.LogInformation("[CallExternalRefundAsync] ◀◀ Raw response: {Raw}", raw);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        return (false, $"External API call failed with status code {response.StatusCode}");
+                    }
+
+                    var respObj = JsonSerializer.Deserialize<ExternalRefundResponseDto>(
+                        raw,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                    );
+                    if (respObj?.Header == null)
+                    {
+                        return (false, "Malformed response from external API.");
+                    }
+
+                    bool success = respObj.Header.ReturnCode.Equals(
+                        "Success", StringComparison.OrdinalIgnoreCase
+                    );
+                    return (success, respObj.Header.ReturnMessage);
+                }
+                catch (HttpRequestException ex)
+                {
+                    logger.LogError(ex, "[CallExternalRefundAsync] HTTP request failed");
+                    return (false, $"HTTP Request Exception: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "[CallExternalRefundAsync] Unexpected error");
+                    return (false, $"Error: {ex.Message}");
+                }
+            }
+
         public static async Task<IResult> CheckAccountAvailability(
-            [FromQuery] string account,
-            [FromServices] ISettingsRepository settingsRepository)
+    [FromQuery] string account,
+    [FromServices] ISettingsRepository settingsRepository)
         {
             // Log the input account.
             Console.WriteLine($"[CheckAccountAvailability] Input account: {account}");
@@ -405,13 +520,13 @@ namespace CardOpsApi.Endpoints
                     system = "MOBILE",
                     referenceId = GenerateReferenceId(),
                     userName = "TEDMOB",
-                    customerNumber = extractedSixDigits, // the 6-digit value extracted
-                    requestTime = System.DateTime.UtcNow.ToString("o"),
+                    customerNumber = extractedSixDigits,
+                    requestTime = DateTime.UtcNow.ToString("o"),
                     language = "AR"
                 },
                 Details = new Dictionary<string, string>
         {
-            { "@CID", extractedSixDigits },
+            { "@CID",    extractedSixDigits },
             { "@GETAVB", "Y" }
         }
             };
@@ -449,47 +564,120 @@ namespace CardOpsApi.Endpoints
                         AccountString = (acc.YBCD01AB?.Trim() ?? "") +
                                         (acc.YBCD01AN?.Trim() ?? "") +
                                         (acc.YBCD01AS?.Trim() ?? ""),
-                        Account = acc // keep the full account object for later
+                        AccountDto = acc
                     });
 
                 // Check if any concatenated account matches the provided 13-digit account.
                 var matchingAccountInfo = concatenatedAccounts
-                    .FirstOrDefault(x => x.AccountString.Equals(account, System.StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(x => x.AccountString.Equals(account, StringComparison.OrdinalIgnoreCase));
 
                 if (matchingAccountInfo != null)
                 {
-                    var accountConcatenated = matchingAccountInfo.Account.YBCD01AB?.Trim() +
-                                          matchingAccountInfo.Account.YBCD01AN?.Trim() +
-                                          matchingAccountInfo.Account.YBCD01AS?.Trim();
                     Console.WriteLine("[CheckAccountAvailability] Match found.");
+
+                    // Extract the display name from YBCD01CUNA
+                    string accountName = matchingAccountInfo.AccountDto.YBCD01CUNA?.Trim() ?? "";
+
                     return Results.Ok(new
                     {
                         message = "Account was found",
                         code = "accavv",
-                        account = accountConcatenated,
+                        account = matchingAccountInfo.AccountString,
+                        name = accountName
                     });
                 }
                 else
                 {
                     Console.WriteLine("[CheckAccountAvailability] No matching account found.");
-                    return Results.Ok(new { message = "Account not found", code = "accnff" });
+                    return Results.Ok(new
+                    {
+                        message = "Account not found",
+                        code = "accnff"
+                    });
                 }
             }
             catch (HttpRequestException ex)
             {
                 return Results.BadRequest($"HTTP Request Exception: {ex.Message}");
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 return Results.BadRequest($"Error: {ex.Message}");
             }
 
             // Local helper method to generate a 16-character uppercase reference ID.
-            string GenerateReferenceId()
+            static string GenerateReferenceId()
             {
-                return System.Guid.NewGuid().ToString("N").Substring(0, 16).ToUpper();
+                return Guid.NewGuid().ToString("N").Substring(0, 16).ToUpper();
             }
         }
+
+        // 2) REVERSE REFUND
+        // 2) REVERSE REFUND
+        public static async Task<IResult> ReverseRefund(
+            int id,
+            [FromServices] ITransactionRepository transactionRepository,
+            [FromServices] IMapper mapper,
+            [FromServices] ILogger<TransactionEndpoints> logger)
+        {
+            logger.LogInformation("[ReverseRefund] Start reversing transaction #{TransactionId}", id);
+
+            // 1) Load the original transaction
+            var original = await transactionRepository.GetByIdAsync(id);
+            if (original == null)
+            {
+                logger.LogWarning("[ReverseRefund] Original transaction #{TransactionId} not found", id);
+                return Results.NotFound("Original transaction not found.");
+            }
+
+            string cleanNarr = Regex.Replace(
+                $"Reversal of transaction {original.Id}",   // remove punctuation
+                @"[^A-Za-z0-9 ]",
+                ""
+            );
+
+            var reverseDto = new TransactionCreateDto
+            {
+                FromAccount = original.ToAccount,
+                ToAccount = original.FromAccount,
+                Amount = original.Amount,
+                Narrative = cleanNarr,
+                Status = original.Status,
+                Type = original.Type,
+                DefinitionId = original.DefinitionId,
+                CurrencyId = original.CurrencyId,
+                ReasonId = original.ReasonId
+            };
+
+            logger.LogInformation("[ReverseRefund] Prepared reverseDto: {@ReverseDto}", reverseDto);
+
+            // 3) Call the same external-postTransfer API
+            var (isSuccess, message) = await CallExternalRefundAsync(reverseDto, logger);
+
+            logger.LogInformation(
+                "[ReverseRefund] External API reply: Success={Success}, Message={Message}",
+                isSuccess, message);
+
+            if (!isSuccess)
+                return Results.BadRequest(message);
+
+            // 4) Persist the “reverse” transaction in your DB
+            var newEntity = mapper.Map<Transactions>(reverseDto);
+            await transactionRepository.CreateAsync(newEntity);
+            var newDto = mapper.Map<TransactionDto>(newEntity);
+
+            logger.LogInformation("[ReverseRefund] Saved reversal transaction #{NewId}", newDto.Id);
+
+            // 5) Return Created(201) with the new record
+            return Results.Created(
+                $"/api/transactions/{newDto.Id}",
+                new { Message = $"Reversal successful for TX #{original.Id}.", Transaction = newDto }
+            );
+        }
+
+
+
+
 
         public static async Task<IResult> GetExternalTransactions(
      [FromQuery] string account,
@@ -622,6 +810,7 @@ namespace CardOpsApi.Endpoints
             public string? YBCD01AB { get; set; }
             public string? YBCD01AN { get; set; }
             public string? YBCD01AS { get; set; }
+            public string? YBCD01CUNA { get; set; }
         }
 
         public class ExternalAccountsResponseDetailsDto

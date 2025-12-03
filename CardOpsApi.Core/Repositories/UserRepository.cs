@@ -147,17 +147,18 @@ namespace CardOpsApi.Core.Repositories
             foreach (var user in users)
             {
                 // Reuse your existing logic to fetch additional auth info.
-                var authUser = await FetchAuthUserDetails(user.Id, authToken);
+                var authUser = await FetchAuthUserDetails(user.AuthUserId, authToken);
                 userDetailsList.Add(new UserDetailsDto
                 {
                     UserId = user.Id,
-                    AuthUserId = authUser?.Id ?? 0,
+                    AuthUserId = user.AuthUserId,
                     FirstName = user.FirstName,
                     LastName = user.LastName,
                     Email = user.Email,
                     Phone = user.Phone,
                     Role = user.Role,
                     RoleId = user.Role?.Id ?? 0,
+                    Active = authUser?.Active ?? false,
                     IsTwoFactorEnabled = authUser?.IsTwoFactorEnabled ?? false,
                     PasswordResetToken = authUser?.PasswordResetToken
                 });
@@ -199,7 +200,7 @@ namespace CardOpsApi.Core.Repositories
             if (user == null)
                 return null;
 
-            var authUser = await FetchAuthUserDetails(userId, authToken);
+            var authUser = await FetchAuthUserDetails(user.AuthUserId, authToken);
 
             // Get the permission Ids assigned to the user via the join table
             var userPermissionIds = await _context.UserRolePermissions
@@ -215,14 +216,15 @@ namespace CardOpsApi.Core.Repositories
 
             return new UserDetailsDto
             {
-                AuthUserId = user.Id,
+                UserId = user.Id,
+                AuthUserId = user.AuthUserId,
                 FirstName = user.FirstName,
                 LastName = user.LastName,
                 Email = user.Email,
                 Phone = user.Phone,
                 Role = user.Role,
                 RoleId = user.Role?.Id ?? 0,
-
+                Active = authUser?.Active ?? false,
                 IsTwoFactorEnabled = authUser?.IsTwoFactorEnabled ?? false,
                 PasswordResetToken = authUser?.PasswordResetToken,
                 Permissions = userPermissionNames
@@ -240,7 +242,7 @@ namespace CardOpsApi.Core.Repositories
                 return null;
 
             // Get the auth system details (if needed)
-            var authUser = await FetchAuthUserDetails(user.Id, authToken);
+            var authUser = await FetchAuthUserDetails(user.AuthUserId, authToken);
 
             // Get the permission Ids assigned to the user via the join table
             var userPermissionIds = await _context.UserRolePermissions
@@ -265,19 +267,20 @@ namespace CardOpsApi.Core.Repositories
                 Phone = user.Phone,
                 Role = user.Role,
                 RoleId = user.Role?.Id ?? 0,
-
+                Active = authUser?.Active ?? false,
                 IsTwoFactorEnabled = authUser?.IsTwoFactorEnabled ?? false,
                 PasswordResetToken = authUser?.PasswordResetToken,
                 Permissions = userPermissionNames
             };
         }
 
-        private async Task<AuthUserDto?> FetchAuthUserDetails(int userId, string authToken)
+        private async Task<AuthUserDto?> FetchAuthUserDetails(int authUserId, string authToken)
         {
             try
             {
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
-                var response = await _httpClient.GetAsync($"http://10.1.1.205/authapi/api/users/{userId}");
+                // Use the same base as registration endpoint (authcardopsapi)
+                var response = await _httpClient.GetAsync($"http://10.1.1.205/authcardopsapi/api/users/{authUserId}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -359,3 +362,4 @@ namespace CardOpsApi.Core.Repositories
         }
     }
 }
+

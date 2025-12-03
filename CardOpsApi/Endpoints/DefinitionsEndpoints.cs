@@ -84,23 +84,40 @@ namespace CardOpsApi.Endpoints
         }
 
         // POST /api/definitions
+        // POST /api/definitions
         public static async Task<IResult> CreateDefinition(
             [FromBody] DefinitionCreateDto createDto,
             [FromServices] IDefinitionRepository definitionRepository,
             [FromServices] IMapper mapper,
             [FromServices] IValidator<DefinitionCreateDto> validator)
         {
+            // 1. Validate DTO
             ValidationResult validationResult = await validator.ValidateAsync(createDto);
             if (!validationResult.IsValid)
             {
                 return Results.BadRequest(validationResult.Errors.Select(e => e.ErrorMessage));
             }
 
+            // 2. Uniqueness check
+            var matches = await definitionRepository.GetAllAsync(
+                createDto.AccountNumber,    // searchTerm 
+                "accountnumber",            // searchBy
+                null,                       // type
+                page: 1,
+                limit: 1
+            );
+            if (matches.Any())
+            {
+                return Results.BadRequest("Atm/Pos already exists");
+            }
+
+            // 3. Create as before
             var definition = mapper.Map<Definition>(createDto);
             await definitionRepository.CreateAsync(definition);
             var dto = mapper.Map<DefinitionDto>(definition);
             return Results.Created($"/api/definitions/{dto.Id}", dto);
         }
+
 
         // PUT /api/definitions/{id}
         public static async Task<IResult> UpdateDefinition(

@@ -21,6 +21,9 @@ namespace CardOpsApi.Core.Dtos
         public string? ReasonName { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
+
+        public string FromAccountName { get; set; } = string.Empty;
+        public string ToAccountName { get; set; } = string.Empty;
     }
 
     public class TransactionCreateDto

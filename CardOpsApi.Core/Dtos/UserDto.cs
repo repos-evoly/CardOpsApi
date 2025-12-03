@@ -63,7 +63,7 @@ namespace CardOpsApi.Core.Dtos
         public int RoleId { get; set; }
 
 
-
+        public bool Active { get; set; }
         public int AreaId { get; set; }
         public bool IsTwoFactorEnabled { get; set; }
         public string? PasswordResetToken { get; set; }

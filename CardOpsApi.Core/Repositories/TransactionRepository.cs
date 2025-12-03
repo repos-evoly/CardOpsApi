@@ -68,7 +68,7 @@ namespace CardOpsApi.Data.Repositories
                 }
             }
 
-            return await query.OrderByDescending(t => t.Date)
+            return await query.OrderByDescending(t => t.CreatedAt)
                               .Skip((page - 1) * limit)
                               .Take(limit)
                               .AsNoTracking()
