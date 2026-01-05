@@ -17,6 +17,7 @@ using CardOpsApi.Data.Abstractions;
 using System.Text.Json;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Configuration;
 
 namespace CardOpsApi.Endpoints
 {
@@ -70,11 +71,11 @@ namespace CardOpsApi.Endpoints
                         .WithName("GetTopReasons")
                         .Produces<List<TopReasonDto>>(200);
 
-            transactions.MapGet("/check-account", CheckAccountAvailability)
+            transactions.MapGet("/check-account", CheckAccountAvailabilitySlim)
                         .WithName("CheckAccountAvailability")
                         .Produces(200)
                         .Produces(400);
-            transactions.MapGet("/external", GetExternalTransactions)
+            transactions.MapGet("/external", GetExternalTransactionsSlim)
                         .WithName("GetExternalTransactions")
                         .Produces<List<ExternalTransactionDto>>(200)
                         .Produces(400);
@@ -116,7 +117,7 @@ namespace CardOpsApi.Endpoints
                 dto.FromAccountName = tx.Definition?.Name?.Trim() ?? "Not available";
 
                 // 2) resolve the external account name
-                dto.ToAccountName = await ResolveExternalAccountNameAsync(tx.ToAccount);
+                dto.ToAccountName = await transactionRepository.ResolveExternalAccountNameAsync(tx.ToAccount);
 
                 resultList.Add(dto);
             }
@@ -159,36 +160,42 @@ namespace CardOpsApi.Endpoints
                 return Results.BadRequest(validationResult.Errors.Select(e => e.ErrorMessage));
             }
 
-            // If the Status indicates a refund, call the external API first.
-            if (!string.IsNullOrWhiteSpace(createDto.Status) &&
-                createDto.Status.ToLower().Contains("refund"))
-            {
-                logger.LogInformation(
-                    "[CreateTransaction] Initiating external refund from {FromAccount} to {ToAccount} for amount {Amount}",
-                    createDto.FromAccount, createDto.ToAccount, createDto.Amount);
+            var result = await transactionRepository.CreateWithCoreAsync(createDto, logger);
+            if (!result.success || result.saved == null)
+                return Results.BadRequest(result.message);
 
-                var refundResult = await CallExternalRefundAsync(createDto, logger);
+            var dto = mapper.Map<TransactionDto>(result.saved);
+            string message = !string.IsNullOrWhiteSpace(createDto.Status) && createDto.Status.ToLower().Contains("refund")
+                ? $"Refund was successful from {createDto.FromAccount} to {createDto.ToAccount} with amount {createDto.Amount}."
+                : "Created";
+            return Results.Created($"/api/transactions/{dto.Id}", new { Message = message, Transaction = dto });
+        }
 
-                logger.LogInformation(
-                    "[CreateTransaction] External refund returned Success={Success}, Message={Message}",
-                    refundResult.isSuccess, refundResult.message);
+        // Slim handler delegating to repository: external transactions
+        public static async Task<IResult> GetExternalTransactionsSlim(
+            [FromQuery] string account,
+            [FromQuery] DateTime fromDate,
+            [FromQuery] DateTime toDate,
+            [FromServices] ITransactionRepository transactionRepository)
+        {
+            var list = await transactionRepository.GetExternalTransactionsAsync(account, fromDate, toDate);
+            return Results.Ok(list);
+        }
 
-                if (!refundResult.isSuccess)
-                {
-                    // Return the error message from the external API.
-                    return Results.BadRequest(refundResult.message);
-                }
-            }
+        // Slim handler delegating to repository: account availability
+        public static async Task<IResult> CheckAccountAvailabilitySlim(
+            [FromQuery] string account,
+            [FromServices] ITransactionRepository transactionRepository)
+        {
+            if (string.IsNullOrWhiteSpace(account) || account.Length != 13)
+                return Results.BadRequest("Account number must be exactly 13 digits.");
 
-            // Add the transaction to our system.
-            var transaction = mapper.Map<Transactions>(createDto);
-            await transactionRepository.CreateAsync(transaction);
-            var dto = mapper.Map<TransactionDto>(transaction);
+            var ok = await transactionRepository.CheckAccountAvailabilityAsync(account);
+            if (!ok)
+                return Results.Ok(new { message = "Account not found", code = "accnff" });
 
-            // Construct a success message.
-            string successMessage = $"Refund was successful from {createDto.FromAccount} to {createDto.ToAccount} with amount {createDto.Amount}.";
-
-            return Results.Created($"/api/transactions/{dto.Id}", new { Message = successMessage, Transaction = dto });
+            var name = await transactionRepository.ResolveExternalAccountNameAsync(account);
+            return Results.Ok(new { message = "Account was found", code = "accavv", account, name });
         }
 
 
@@ -333,7 +340,7 @@ namespace CardOpsApi.Endpoints
 
             var topReasons = transactions
                 .Where(t => t.Reason != null)
-                .GroupBy(t => new { t.Reason.Id, t.Reason.NameAR })
+                .GroupBy(t => new { Id = t.Reason!.Id, NameAR = t.Reason!.NameAR })
                 .Select(g => new TopReasonDto
                 {
                     ReasonId = g.Key.Id,
@@ -350,7 +357,12 @@ namespace CardOpsApi.Endpoints
 
         private static async Task<string> ResolveExternalAccountNameAsync(string fullAccount)
         {
-            const string url = "http://10.1.1.205:7070/api/mobile/accounts";
+            var cfg2 = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build();
+            var env2 = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+            var base2 = (string.Equals(env2, "Production", StringComparison.OrdinalIgnoreCase)
+                ? cfg2["CoreApi:BaseUrlProd"]
+                : cfg2["CoreApi:BaseUrlNonProd"]) ?? "http://10.3.3.11:7070";
+            var url = $"{base2}/api/mobile/accounts";
 
             // Extract the six digits
             if (string.IsNullOrWhiteSpace(fullAccount) || fullAccount.Length != 13)
@@ -407,7 +419,7 @@ namespace CardOpsApi.Endpoints
 
         // Private method to call the external refund API.
         // 3) EXTERNAL REFUND HELPER
-            private static async Task<(bool isSuccess, string message)> CallExternalRefundAsync(
+            private static async Task<(bool isSuccess, string message, string requestJson, string responseJson, string referenceId)> CallExternalRefundAsync(
                 TransactionCreateDto createDto,
                 ILogger<TransactionEndpoints> logger)
             {
@@ -426,12 +438,13 @@ namespace CardOpsApi.Endpoints
                 long amountInUnits = (long)Math.Round(createDto.Amount * scaleFactor, MidpointRounding.AwayFromZero);
                 string formattedAmount = amountInUnits.ToString("D15");
 
+                var reqRefId = GenerateReferenceId();
                 var requestObj = new
                 {
                     Header = new
                     {
                         system = "MOBILE",
-                        referenceId = GenerateReferenceId(),
+                        referenceId = reqRefId,
                         userName = "TEDMOB",
                         customerNumber = createDto.ToAccount,
                         requestTime = DateTime.UtcNow.ToString("o"),
@@ -457,7 +470,12 @@ namespace CardOpsApi.Endpoints
                 try
                 {
                     using var client = new HttpClient();
-                    string url = "http://10.1.1.205:7070/api/mobile/postTransfer";
+                    var cfg = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build();
+                    var envName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                    var baseUrl = (string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase)
+                        ? cfg["CoreApi:BaseUrlProd"]
+                        : cfg["CoreApi:BaseUrlNonProd"]) ?? "http://10.3.3.11:7070";
+                    string url = $"{baseUrl}/api/mobile/postTransfer";
                     var response = await client.PostAsJsonAsync(url, requestObj);
 
                     // Capture and log the raw response
@@ -466,7 +484,7 @@ namespace CardOpsApi.Endpoints
 
                     if (!response.IsSuccessStatusCode)
                     {
-                        return (false, $"External API call failed with status code {response.StatusCode}");
+                        return (false, $"External API call failed with status code {response.StatusCode}", payloadJson, raw, reqRefId);
                     }
 
                     var respObj = JsonSerializer.Deserialize<ExternalRefundResponseDto>(
@@ -475,23 +493,23 @@ namespace CardOpsApi.Endpoints
                     );
                     if (respObj?.Header == null)
                     {
-                        return (false, "Malformed response from external API.");
+                        return (false, "Malformed response from external API.", payloadJson, raw, reqRefId);
                     }
 
                     bool success = respObj.Header.ReturnCode.Equals(
                         "Success", StringComparison.OrdinalIgnoreCase
                     );
-                    return (success, respObj.Header.ReturnMessage);
+                    return (success, respObj.Header.ReturnMessage, payloadJson, raw, reqRefId);
                 }
                 catch (HttpRequestException ex)
                 {
                     logger.LogError(ex, "[CallExternalRefundAsync] HTTP request failed");
-                    return (false, $"HTTP Request Exception: {ex.Message}");
+                    return (false, $"HTTP Request Exception: {ex.Message}", payloadJson, string.Empty, reqRefId);
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "[CallExternalRefundAsync] Unexpected error");
-                    return (false, $"Error: {ex.Message}");
+                    return (false, $"Error: {ex.Message}", payloadJson, string.Empty, reqRefId);
                 }
             }
 
@@ -534,7 +552,12 @@ namespace CardOpsApi.Endpoints
             try
             {
                 using var client = new HttpClient();
-                string url = "http://10.1.1.205:7070/api/mobile/accounts";
+                var config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build();
+                var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+                var baseUrl = (string.Equals(env, "Production", StringComparison.OrdinalIgnoreCase)
+                    ? config["CoreApi:BaseUrlProd"]
+                    : config["CoreApi:BaseUrlNonProd"]) ?? "http://10.3.3.11:7070";
+                string url = $"{baseUrl}/api/mobile/accounts";
                 var response = await client.PostAsJsonAsync(url, requestObj);
                 if (!response.IsSuccessStatusCode)
                 {
@@ -621,6 +644,25 @@ namespace CardOpsApi.Endpoints
             [FromServices] ILogger<TransactionEndpoints> logger)
         {
             logger.LogInformation("[ReverseRefund] Start reversing transaction #{TransactionId}", id);
+            var original = await transactionRepository.GetByIdAsync(id);
+            if (original == null)
+                return Results.NotFound("Original transaction not found.");
+
+            var result = await transactionRepository.ReverseRefundAsync(id, logger);
+            if (!result.success || result.saved == null)
+                return Results.BadRequest(result.message);
+
+            var dto = mapper.Map<TransactionDto>(result.saved);
+            return Results.Created($"/api/transactions/{dto.Id}", new { Message = $"Reversal successful for TX #{original.Id}.", Transaction = dto });
+        }
+
+        public static async Task<IResult> ReverseRefundLegacy(
+            int id,
+            [FromServices] ITransactionRepository transactionRepository,
+            [FromServices] IMapper mapper,
+            [FromServices] ILogger<TransactionEndpoints> logger)
+        {
+            logger.LogInformation("[ReverseRefund] Start reversing transaction #{TransactionId}", id);
 
             // 1) Load the original transaction
             var original = await transactionRepository.GetByIdAsync(id);
@@ -652,17 +694,20 @@ namespace CardOpsApi.Endpoints
             logger.LogInformation("[ReverseRefund] Prepared reverseDto: {@ReverseDto}", reverseDto);
 
             // 3) Call the same external-postTransfer API
-            var (isSuccess, message) = await CallExternalRefundAsync(reverseDto, logger);
+            var reverseResult = await CallExternalRefundAsync(reverseDto, logger);
 
             logger.LogInformation(
                 "[ReverseRefund] External API reply: Success={Success}, Message={Message}",
-                isSuccess, message);
+                reverseResult.isSuccess, reverseResult.message);
 
-            if (!isSuccess)
-                return Results.BadRequest(message);
+            if (!reverseResult.isSuccess)
+                return Results.BadRequest(reverseResult.message);
 
             // 4) Persist the “reverse” transaction in your DB
             var newEntity = mapper.Map<Transactions>(reverseDto);
+            newEntity.ReverseRefId = newEntity.ReverseRefId ?? reverseResult.referenceId;
+            newEntity.CoreRequest = reverseResult.requestJson;
+            newEntity.CoreResponse = reverseResult.responseJson;
             await transactionRepository.CreateAsync(newEntity);
             var newDto = mapper.Map<TransactionDto>(newEntity);
 
@@ -713,7 +758,12 @@ namespace CardOpsApi.Endpoints
         }
             };
 
-            using var client = new HttpClient { BaseAddress = new Uri("http://10.1.1.205:7070") };
+            var config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build();
+            var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+            var baseUrl = (string.Equals(env, "Production", StringComparison.OrdinalIgnoreCase)
+                ? config["CoreApi:BaseUrlProd"]
+                : config["CoreApi:BaseUrlNonProd"]) ?? "http://10.3.3.11:7070";
+            using var client = new HttpClient { BaseAddress = new Uri(baseUrl) };
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             var resp = await client.PostAsJsonAsync("/api/mobile/transactions", payload);
             var body = await resp.Content.ReadAsStringAsync();

@@ -9,6 +9,8 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace CardOpsApi.Core.Repositories
 {
@@ -16,11 +18,22 @@ namespace CardOpsApi.Core.Repositories
     {
         private readonly CardOpsApiDbContext _context;
         private readonly HttpClient _httpClient;
+        private readonly IConfiguration _config;
+        private readonly IHostEnvironment _env;
 
-        public UserRepository(CardOpsApiDbContext context, HttpClient httpClient)
+        public UserRepository(CardOpsApiDbContext context, HttpClient httpClient, IConfiguration config, IHostEnvironment env)
         {
             _context = context;
             _httpClient = httpClient;
+            _config = config;
+            _env = env;
+        }
+
+        private string GetAuthBaseUrl()
+        {
+            var prod = _config["AuthApi:BaseUrlProd"] ?? "http://10.1.1.205/authcardopsapi";
+            var nonProd = _config["AuthApi:BaseUrlNonProd"] ?? "http://10.3.3.11/authcardopsapi";
+            return _env.IsProduction() ? prod : nonProd;
         }
 
         public async Task<bool> AddUser(User user)
@@ -279,8 +292,8 @@ namespace CardOpsApi.Core.Repositories
             try
             {
                 _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
-                // Use the same base as registration endpoint (authcardopsapi)
-                var response = await _httpClient.GetAsync($"http://10.1.1.205/authcardopsapi/api/users/{authUserId}");
+                var baseUrl = GetAuthBaseUrl();
+                var response = await _httpClient.GetAsync($"{baseUrl}/api/users/{authUserId}");
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -293,6 +306,34 @@ namespace CardOpsApi.Core.Repositories
                 // Log error if needed
             }
             return null;
+        }
+
+        public async Task<AuthRegisterResponseDto?> RegisterAuthUserAsync(UserRegistrationDto userDto, string authToken)
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
+            var authPayload = new
+            {
+                fullNameLT = userDto.FirstName,
+                fullNameAR = userDto.FirstName,
+                email = userDto.Email,
+                password = userDto.Password,
+                roleId = userDto.RoleId
+            };
+            var jsonPayload = JsonSerializer.Serialize(authPayload);
+            var content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
+            var baseUrl = GetAuthBaseUrl();
+            var response = await _httpClient.PostAsync($"{baseUrl}/api/auth/register", content);
+            var responseBody = await response.Content.ReadAsStringAsync();
+            if (string.IsNullOrEmpty(responseBody)) return null;
+            try
+            {
+                var obj = JsonSerializer.Deserialize<AuthRegisterResponseDto>(responseBody, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                return obj;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private async Task AssignDefaultPermissions(int userId, int roleId)

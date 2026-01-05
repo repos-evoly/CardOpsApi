@@ -44,5 +44,16 @@ namespace CardOpsApi.Data.Models
 
         [ForeignKey(nameof(CurrencyId))]
         public Currency Currency { get; set; } = null!;
+
+        // External reference IDs for transfer and its reversal
+        [MaxLength(100)]
+        public string? ReferenceId { get; set; }
+
+        [MaxLength(100)]
+        public string? ReverseRefId { get; set; }
+
+        // Payloads exchanged with core banking (JSON)
+        public string? CoreRequest { get; set; }
+        public string? CoreResponse { get; set; }
     }
 }

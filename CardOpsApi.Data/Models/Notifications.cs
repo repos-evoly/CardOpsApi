@@ -34,7 +34,6 @@ namespace CardOpsApi.Data.Models
         // Read status (default is false)
         public bool IsRead { get; set; } = false;
 
-        // Date and time when the notification was created
-        public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+        // Audit timestamps are inherited from Auditable (CreatedAt/UpdatedAt).
     }
 }

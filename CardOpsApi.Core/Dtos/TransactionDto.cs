@@ -24,6 +24,14 @@ namespace CardOpsApi.Core.Dtos
 
         public string FromAccountName { get; set; } = string.Empty;
         public string ToAccountName { get; set; } = string.Empty;
+
+        // External reference IDs
+        public string? ReferenceId { get; set; }
+        public string? ReverseRefId { get; set; }
+
+        // Core payloads (JSON)
+        public string? CoreRequest { get; set; }
+        public string? CoreResponse { get; set; }
     }
 
     public class TransactionCreateDto
@@ -41,6 +49,10 @@ namespace CardOpsApi.Core.Dtos
         public int CurrencyId { get; set; }
         // Optional: Reason foreign key
         public int? ReasonId { get; set; }
+
+        // External reference IDs
+        public string? ReferenceId { get; set; }
+        public string? ReverseRefId { get; set; }
     }
 
     public class TransactionUpdateDto
@@ -57,6 +69,10 @@ namespace CardOpsApi.Core.Dtos
         public int CurrencyId { get; set; }
         // Optional: Reason foreign key
         public int? ReasonId { get; set; }
+
+        // External reference IDs
+        public string? ReferenceId { get; set; }
+        public string? ReverseRefId { get; set; }
     }
 
     // Other DTO classes remain unchanged.

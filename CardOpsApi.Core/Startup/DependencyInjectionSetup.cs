@@ -188,7 +188,7 @@ namespace CardOpsApi.Core.Startup
       ;
       services.AddScoped<IUserRepository, UserRepository>();
       services.AddScoped<IRoleRepository, RoleRepository>();
-      services.AddScoped<ITransactionRepository, TransactionRepository>();
+      services.AddHttpClient<ITransactionRepository, TransactionRepository>();
       services.AddScoped<IDefinitionRepository, DefinitionRepository>();
       services.AddScoped<ISettingsRepository, SettingsRepository>();
       services.AddScoped<ICurrencyRepository, CurrencyRepository>();

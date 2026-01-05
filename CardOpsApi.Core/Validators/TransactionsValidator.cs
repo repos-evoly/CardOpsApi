@@ -29,6 +29,15 @@ namespace CardOpsApi.Core.Validators
             RuleFor(x => x.Amount)
                 .GreaterThanOrEqualTo(0).WithMessage("Amount cannot be negative.")
                 .WithMessage("Amount cannot be negative.");
+
+            // Optional reference IDs length
+            RuleFor(x => x.ReferenceId)
+                .MaximumLength(100).When(x => !string.IsNullOrEmpty(x.ReferenceId))
+                .WithMessage("ReferenceId cannot exceed 100 characters.");
+
+            RuleFor(x => x.ReverseRefId)
+                .MaximumLength(100).When(x => !string.IsNullOrEmpty(x.ReverseRefId))
+                .WithMessage("ReverseRefId cannot exceed 100 characters.");
         }
     }
 
@@ -59,6 +68,15 @@ namespace CardOpsApi.Core.Validators
                 .WithMessage("Amount cannot be negative.");
 
             // Date should be a valid date/time; if you want additional checks (e.g., not in the future), add them here.
+
+            // Optional reference IDs length
+            RuleFor(x => x.ReferenceId)
+                .MaximumLength(100).When(x => !string.IsNullOrEmpty(x.ReferenceId))
+                .WithMessage("ReferenceId cannot exceed 100 characters.");
+
+            RuleFor(x => x.ReverseRefId)
+                .MaximumLength(100).When(x => !string.IsNullOrEmpty(x.ReverseRefId))
+                .WithMessage("ReverseRefId cannot exceed 100 characters.");
         }
     }
 }

@@ -8,6 +8,7 @@ namespace CardOpsApi.Core.Abstractions
     public interface IUserRepository
     {
         Task<bool> AddUser(User user);
+        Task<AuthRegisterResponseDto?> RegisterAuthUserAsync(UserRegistrationDto userDto, string authToken);
         Task<bool> AssignRole(int userId, int roleId);
         Task<bool> AssignUserPermissions(int userId, List<UserPermissionAssignmentDto> permissions);
 

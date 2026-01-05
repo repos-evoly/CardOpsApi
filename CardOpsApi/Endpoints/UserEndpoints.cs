@@ -84,7 +84,7 @@ namespace CardOpsApi.Endpoints
         }
 
 
-        public static async Task<IResult> SetCookies([FromBody] CookieDto cookieDto, HttpContext context)
+        public static IResult SetCookies([FromBody] CookieDto cookieDto, HttpContext context)
         {
             // Define cookie options (customize as needed).
             var options = new CookieOptions
@@ -135,7 +135,12 @@ namespace CardOpsApi.Endpoints
             var jsonPayload = JsonSerializer.Serialize(authPayload);
             var content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await httpClient.PostAsync("http://10.1.1.205/authcardopsapi/api/auth/register", content);
+            var config = new ConfigurationBuilder().AddJsonFile("appsettings.json", optional: false).Build();
+            var envName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+            var authBase = (string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase)
+                ? config["AuthApi:BaseUrlProd"]
+                : config["AuthApi:BaseUrlNonProd"]) ?? "http://10.3.3.11/authcardopsapi";
+            var response = await httpClient.PostAsync($"{authBase}/api/auth/register", content);
             var responseBody = await response.Content.ReadAsStringAsync();
 
             // ✅ Check if response body is empty or malformed
@@ -249,6 +254,8 @@ namespace CardOpsApi.Endpoints
                 return Results.BadRequest("Invalid user.");
 
             // Use the role from the fetched user details.
+            if (currentUser.Role == null)
+                return Results.BadRequest("User has no role.");
             string currentUserRole = currentUser.Role.NameLT;
             var managementUsers = await userRepository.GetManagementUsersAsync(currentUserRole);
             logger.LogInformation("Retrieved {Count} management users.", managementUsers.Count);
