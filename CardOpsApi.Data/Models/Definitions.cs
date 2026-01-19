@@ -11,6 +11,8 @@ namespace CardOpsApi.Data.Models
         [Key]
         public int Id { get; set; }
 
+        public bool IsDeleted { get; set; } = false;
+
         [Required]
         [MaxLength(50)]
         public string AccountNumber { get; set; } = string.Empty;

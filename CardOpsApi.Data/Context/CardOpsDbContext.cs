@@ -145,6 +145,10 @@ namespace CardOpsApi.Data.Context
             builder.Entity<Transactions>()
                 .Property(t => t.Amount)
                 .HasPrecision(18, 2);
+
+            // Global query filters
+            builder.Entity<Definition>()
+                .HasQueryFilter(d => !d.IsDeleted);
         }
 
 

@@ -26,10 +26,12 @@ namespace CardOpsApi.Data.Repositories
 
         public async Task DeleteAsync(int id)
         {
-            var definition = await _context.Definitions.FindAsync(id);
+            // Fetch respecting global filters (won't return already-deleted rows)
+            var definition = await _context.Definitions.FirstOrDefaultAsync(d => d.Id == id);
             if (definition != null)
             {
-                _context.Definitions.Remove(definition);
+                definition.IsDeleted = true;
+                _context.Definitions.Update(definition);
                 await _context.SaveChangesAsync();
             }
         }
