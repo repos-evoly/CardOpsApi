@@ -298,7 +298,7 @@ namespace CardOpsApi.Endpoints
 
             // Amount is formatted as integer units with 3 implied decimal places (same as existing code)
             const int DEC = 3;
-            decimal amount     = record.TotalAmount;
+            decimal amount     = record.NetAmount;
             long amountUnits   = (long)Math.Round(amount * (decimal)Math.Pow(10, DEC), MidpointRounding.AwayFromZero);
             string formattedAmt = amountUnits.ToString("D15");
 
