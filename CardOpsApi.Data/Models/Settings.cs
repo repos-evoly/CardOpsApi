@@ -14,6 +14,6 @@ namespace CardOpsApi.Data.Models
 
         public int TopReasonLimit { get; set; } = 10; // default to 10
 
-        public string FisBankAccount {get; set;} = "0015798000001";
+        public string FisBankAccount {get; set;} = "0010838890434";
     }
 }

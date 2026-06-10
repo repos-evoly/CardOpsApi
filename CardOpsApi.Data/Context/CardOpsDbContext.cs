@@ -60,7 +60,7 @@ namespace CardOpsApi.Data.Context
 
             builder.Entity<Settings>()
                 .Property(s => s.FisBankAccount)
-                .HasDefaultValue("0015798000001");
+                .HasDefaultValue("0010838890434");
 
             // User - Role Relationship
             builder.Entity<User>()

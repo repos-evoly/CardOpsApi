@@ -54,6 +54,9 @@ namespace CardOpsApi.Endpoints
             if (settingsDto.TopReasonLimit.HasValue)
                 settings.TopReasonLimit = settingsDto.TopReasonLimit.Value;
 
+            if (!string.IsNullOrWhiteSpace(settingsDto.FisBankAccount))
+                settings.FisBankAccount = settingsDto.FisBankAccount;
+
 
 
             settingsRepository.Update(settings);
