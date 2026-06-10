@@ -4,6 +4,7 @@ using CardOpsApi.Data.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CardOpsApi.Data.Migrations
 {
     [DbContext(typeof(CardOpsApiDbContext))]
-    partial class CardOpsApiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260602093942_AddFisBankRecords")]
+    partial class AddFisBankRecords
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -133,39 +136,6 @@ namespace CardOpsApi.Data.Migrations
                     b.ToTable("Definitions");
                 });
 
-            modelBuilder.Entity("CardOpsApi.Data.Models.FisBankFile", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
-
-                    b.Property<int>("FirstRecordId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ImportedCount")
-                        .HasColumnType("int");
-
-                    b.Property<int>("LastRecordId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("FisBankFiles");
-                });
-
             modelBuilder.Entity("CardOpsApi.Data.Models.FisBankRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -191,16 +161,6 @@ namespace CardOpsApi.Data.Migrations
 
                     b.Property<decimal>("DiscountRate")
                         .HasColumnType("decimal(18,4)");
-
-                    b.Property<string>("FailureReason")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("FisBankFileId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasMaxLength(500)
-                        .HasColumnType("bit");
 
                     b.Property<string>("MerchantName")
                         .HasMaxLength(200)
@@ -239,8 +199,6 @@ namespace CardOpsApi.Data.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("FisBankFileId");
 
                     b.ToTable("FisBankRecords");
                 });
@@ -418,12 +376,6 @@ namespace CardOpsApi.Data.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("FisBankAccount")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("nvarchar(max)")
-                        .HasDefaultValue("0015798000001");
 
                     b.Property<int>("TopAtmRefundLimit")
                         .HasColumnType("int");
@@ -631,17 +583,6 @@ namespace CardOpsApi.Data.Migrations
                     b.Navigation("Currency");
                 });
 
-            modelBuilder.Entity("CardOpsApi.Data.Models.FisBankRecord", b =>
-                {
-                    b.HasOne("CardOpsApi.Data.Models.FisBankFile", "FisBankFile")
-                        .WithMany("Records")
-                        .HasForeignKey("FisBankFileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("FisBankFile");
-                });
-
             modelBuilder.Entity("CardOpsApi.Data.Models.Notification", b =>
                 {
                     b.HasOne("CardOpsApi.Data.Models.User", "FromUser")
@@ -747,11 +688,6 @@ namespace CardOpsApi.Data.Migrations
             modelBuilder.Entity("CardOpsApi.Data.Models.Definition", b =>
                 {
                     b.Navigation("Transactions");
-                });
-
-            modelBuilder.Entity("CardOpsApi.Data.Models.FisBankFile", b =>
-                {
-                    b.Navigation("Records");
                 });
 
             modelBuilder.Entity("CardOpsApi.Data.Models.Permission", b =>

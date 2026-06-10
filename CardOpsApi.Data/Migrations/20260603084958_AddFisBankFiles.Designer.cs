@@ -4,6 +4,7 @@ using CardOpsApi.Data.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CardOpsApi.Data.Migrations
 {
     [DbContext(typeof(CardOpsApiDbContext))]
-    partial class CardOpsApiDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260603084958_AddFisBankFiles")]
+    partial class AddFisBankFiles
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -192,15 +195,8 @@ namespace CardOpsApi.Data.Migrations
                     b.Property<decimal>("DiscountRate")
                         .HasColumnType("decimal(18,4)");
 
-                    b.Property<string>("FailureReason")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<int>("FisBankFileId")
                         .HasColumnType("int");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasMaxLength(500)
-                        .HasColumnType("bit");
 
                     b.Property<string>("MerchantName")
                         .HasMaxLength(200)
@@ -418,12 +414,6 @@ namespace CardOpsApi.Data.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("FisBankAccount")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("nvarchar(max)")
-                        .HasDefaultValue("0015798000001");
 
                     b.Property<int>("TopAtmRefundLimit")
                         .HasColumnType("int");

@@ -31,6 +31,8 @@ namespace CardOpsApi.Data.Context
         public DbSet<Reason> Reasons => Set<Reason>();
 
         public DbSet<Currency> Currencies => Set<Currency>();
+        public DbSet<FisBankRecord> FisBankRecords => Set<FisBankRecord>();
+        public DbSet<FisBankFile> FisBankFiles => Set<FisBankFile>();
 
 
 
@@ -55,6 +57,10 @@ namespace CardOpsApi.Data.Context
             builder.Entity<Settings>()
                 .HasIndex(s => s.Id)
                 .IsUnique();
+
+            builder.Entity<Settings>()
+                .Property(s => s.FisBankAccount)
+                .HasDefaultValue("0015798000001");
 
             // User - Role Relationship
             builder.Entity<User>()
@@ -146,9 +152,20 @@ namespace CardOpsApi.Data.Context
                 .Property(t => t.Amount)
                 .HasPrecision(18, 2);
 
+            builder.Entity<FisBankRecord>()
+                .HasQueryFilter(r => !r.IsDeleted);
+
+            builder.Entity<FisBankRecord>()
+                .HasOne(r => r.FisBankFile)
+                .WithMany(f => f.Records)
+                .HasForeignKey(r => r.FisBankFileId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Global query filters
             builder.Entity<Definition>()
                 .HasQueryFilter(d => !d.IsDeleted);
+
+
         }
 
 

@@ -33,6 +33,9 @@ namespace CardOpsApi
             CreateMap<ReasonCreateDto, Reason>();
             CreateMap<ReasonUpdateDto, Reason>();
 
+            CreateMap<FisBankRecordCreateDto, FisBankRecord>();
+            CreateMap<FisBankRecord, FisBankRecordDto>();
+
 
             CreateMap<Settings, SettingsDto>()
               .ForMember(dest => dest.TopAtmRefundLimit, opt => opt.MapFrom(src => src.TopAtmRefundLimit))
