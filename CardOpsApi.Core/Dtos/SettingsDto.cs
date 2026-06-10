@@ -4,6 +4,7 @@ namespace CardOpsApi.Core.Dtos
     {
         public int TopAtmRefundLimit { get; set; }
         public int TopReasonLimit { get; set; }
+         public string FisBankAccount {get; set;}
     }
 
     public class SettingsPatchDto
@@ -11,5 +12,6 @@ namespace CardOpsApi.Core.Dtos
 
         public int? TopAtmRefundLimit { get; set; }
         public int? TopReasonLimit { get; set; }
+         public string FisBankAccount {get; set;}
     }
 }

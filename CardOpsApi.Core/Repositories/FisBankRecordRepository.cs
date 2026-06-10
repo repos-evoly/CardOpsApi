@@ -71,8 +71,11 @@ namespace CardOpsApi.Core.Repositories
                         // UPDATE: overwrite every data field from the spreadsheet.
                         // Reset transfer state so the record can be re-processed.
                         // Restore IsDeleted in case the record had been soft-deleted.
+
+                        
+
                         existing.MerchantName      = row.Cell(2).GetValue<string>()?.Trim();
-                        existing.BankingAccountNo  = row.Cell(3).GetValue<string>()?.Trim()?[2..]; //ignores the first two chars from the account number
+                        existing.BankingAccountNo  = row.Cell(3).GetString()?.Trim()?[2..]; //ignores the first two chars from the account number
                         existing.BankName          = row.Cell(4).GetValue<string>()?.Trim();
                         existing.BranchName        = row.Cell(5).GetValue<string>()?.Trim();
                         existing.NetAmount         = ParseDecimal(row.Cell(6)) ?? 0m;
@@ -94,7 +97,7 @@ namespace CardOpsApi.Core.Repositories
                         {
                             MerchantNo        = merchantNo,
                             MerchantName      = row.Cell(2).GetValue<string>()?.Trim(),
-                            BankingAccountNo  = row.Cell(3).GetValue<string>()?.Trim(),
+                            BankingAccountNo  = row.Cell(3).GetString()?.Trim()?[2..], //ignores the first two chars from the account number,
                             BankName          = row.Cell(4).GetValue<string>()?.Trim(),
                             BranchName        = row.Cell(5).GetValue<string>()?.Trim(),
                             NetAmount         = ParseDecimal(row.Cell(6)) ?? 0m,
