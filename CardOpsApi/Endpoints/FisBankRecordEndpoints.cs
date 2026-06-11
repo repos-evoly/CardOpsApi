@@ -299,8 +299,8 @@ namespace CardOpsApi.Endpoints
             // Amount is formatted as integer units with 3 implied decimal places (same as existing code)
             const int DEC = 3;
             decimal amount     = record.NetAmount;
-            // long amountUnits   = (long)Math.Round(amount * (decimal)Math.Pow(10, DEC), MidpointRounding.AwayFromZero);
-            string formattedAmt = amount.ToString();
+            long amountUnits   = (long)Math.Round(amount * (decimal)Math.Pow(10, DEC), MidpointRounding.AwayFromZero);
+            string formattedAmt = amountUnits.ToString();
 
             var refId = Guid.NewGuid().ToString("N").Substring(0, 16).ToUpper();
             var settings = await repo.GetFirstSettingsAsync(); // Fetch the first row

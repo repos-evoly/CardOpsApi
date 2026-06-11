@@ -24,7 +24,7 @@ namespace CardOpsApi.Data.Models
         [MaxLength(200)]
         public string? BranchName { get; set; }
 
-        [Column(TypeName = "decimal(18,5)")]
+        [Column(TypeName = "decimal(18,4)")]
         public decimal NetAmount { get; set; }
 
         public DateTimeOffset ProcessingDate { get; set; }
@@ -32,7 +32,7 @@ namespace CardOpsApi.Data.Models
         [Column(TypeName = "decimal(18,4)")]
         public decimal DiscountRate { get; set; }
 
-        [Column(TypeName = "decimal(18,2)")]
+        [Column(TypeName = "decimal(18,4)")]
         public decimal TotalAmount { get; set; }
 
         [MaxLength(50)]
