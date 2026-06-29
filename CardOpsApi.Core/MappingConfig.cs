@@ -34,7 +34,8 @@ namespace CardOpsApi
             CreateMap<ReasonUpdateDto, Reason>();
 
             CreateMap<FisBankRecordCreateDto, FisBankRecord>();
-            CreateMap<FisBankRecord, FisBankRecordDto>();
+            CreateMap<FisBankRecord, FisBankRecordDto>(); 
+            CreateMap<ManualReverse, ManualReverseDto>();
 
 
             CreateMap<Settings, SettingsDto>()

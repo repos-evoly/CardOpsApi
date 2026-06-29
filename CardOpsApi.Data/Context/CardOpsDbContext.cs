@@ -33,6 +33,7 @@ namespace CardOpsApi.Data.Context
         public DbSet<Currency> Currencies => Set<Currency>();
         public DbSet<FisBankRecord> FisBankRecords => Set<FisBankRecord>();
         public DbSet<FisBankFile> FisBankFiles => Set<FisBankFile>();
+        public DbSet<ManualReverse>      ManualReverse      => Set<ManualReverse>();
 
 
 

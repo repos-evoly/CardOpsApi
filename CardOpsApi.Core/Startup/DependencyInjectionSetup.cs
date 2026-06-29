@@ -195,7 +195,8 @@ namespace CardOpsApi.Core.Startup
       services.AddScoped<IReasonRepository, ReasonRepository>();
       services.AddHttpClient<IUserRepository, UserRepository>();
       services.AddScoped<IAuditLogRepository, AuditLogRepository>();
-      services.AddScoped<IFisBankRecordRepository, FisBankRecordRepository>();
+      services.AddScoped<IFisBankRecordRepository, FisBankRecordRepository>(); 
+      services.AddScoped<IManualReverseRepository, ManualReverseRepository>();
 
 
 
